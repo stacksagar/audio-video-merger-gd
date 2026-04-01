@@ -10,8 +10,6 @@
 # Directories
 
 # Keep the directories but ignore their contents
-/output/*
-/input/*
 !/output/.gitkeep
 !/input/.gitkeep
 

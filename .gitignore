@@ -8,8 +8,6 @@
 *.wmv
 
 # Directories
-/output/
-/input/
 
 # Keep the directories but ignore their contents
 /output/*

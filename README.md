@@ -52,6 +52,7 @@
 - ✅ **Progress tracking** with detailed progress bars
 - ✅ **Cross-platform** - works on Windows, macOS, Linux
 - ✅ **Dry run mode** - preview before merging
+- ✅ **Automatic execution** - no confirmation prompts
 
 ## Options
 

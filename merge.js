@@ -196,22 +196,7 @@ async function main() {
     process.exit(1);
   }
 
-  // Ask for confirmation
-  const readline = require("node:readline");
-  const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout,
-  });
-
-  const answer = await new Promise((resolve) => {
-    rl.question("\nProceed with merging? (y/N): ", resolve);
-  });
-  rl.close();
-
-  if (answer.toLowerCase() !== "y") {
-    console.log("Cancelled.");
-    return;
-  }
+  console.log("\nStarting merge process...");
 
   // Merge pairs
   let successCount = 0;

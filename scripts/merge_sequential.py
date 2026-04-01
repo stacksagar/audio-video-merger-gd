@@ -128,10 +128,6 @@ def main():
         else:
             print(f"\nWarning: {video_files[i]} has no pair (odd number of files)")
     
-    if not pairs:
-        print("\nNo pairs to merge!")
-        sys.exit(1)
-    
     print(f"\nWill create {len(pairs)} merged files in {output_dir}:")
     for file1, file2, output in pairs:
         print(f"  {file1} + {file2} → {output}")
@@ -140,11 +136,15 @@ def main():
         print("\nDry run complete. Use without --dry-run to actually merge.")
         return
     
-    # Confirm
-    response = input("\nProceed with merging? (y/N): ")
-    if response.lower() != 'y':
-        print("Cancelled.")
-        return
+    # Check if ffmpeg is installed
+    try:
+        subprocess.run(["ffmpeg", "-version"], capture_output=True, check=True)
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        print("\nError: ffmpeg not found. Please install ffmpeg and ensure it's in your PATH.")
+        sys.exit(1)
+    
+    # Start merging (no confirmation needed)
+    print("\nStarting merge process...")
     
     # Merge each pair
     success_count = 0

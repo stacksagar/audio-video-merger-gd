@@ -1,0 +1,14 @@
+# Audio Video Merger - Python Dependencies
+
+# Core dependencies
+tqdm>=4.64.0          # Progress bars
+pathlib2>=2.3.0       # Path utilities (for Python < 3.4)
+
+# Optional dependencies for enhanced features
+dataclasses>=0.6; python_version<"3.7"  # Data classes (Python < 3.7)
+typing-extensions>=4.0.0                 # Type hints (Python < 3.8)
+
+# Development dependencies (optional)
+# pytest>=7.0.0       # For testing
+# black>=22.0.0       # For code formatting
+# flake8>=4.0.0       # For linting

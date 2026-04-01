@@ -12,6 +12,7 @@ import sys
 from pathlib import Path
 import re
 import json
+from concurrent.futures import ThreadPoolExecutor
 
 def find_video_files(input_dir):
     """Find all videoplayback files and sort them by number."""
@@ -31,18 +32,18 @@ def find_video_files(input_dir):
 def get_video_duration(file_path):
     """Get video duration in HH:MM:SS format."""
     try:
+        # Use faster ffprobe command to get only duration
         cmd = [
             'ffprobe',
             '-v', 'quiet',
-            '-print_format', 'json',
-            '-show_format',
+            '-show_entries', 'format=duration',
+            '-of', 'csv=p=0',
             str(file_path)
         ]
         
         result = subprocess.run(cmd, capture_output=True, text=True, check=True)
-        data = json.loads(result.stdout)
+        duration_seconds = float(result.stdout.strip())
         
-        duration_seconds = float(data['format']['duration'])
         hours = int(duration_seconds // 3600)
         minutes = int((duration_seconds % 3600) // 60)
         seconds = int(duration_seconds % 60)
@@ -106,18 +107,30 @@ def main():
     for i, file in enumerate(video_files, 1):
         print(f"  {i}. {file}")
     
-    # Process in pairs
+    # Process in pairs with parallel duration detection
     pairs = []
+    
+    # Collect first files from each pair
+    first_files = []
+    pair_indices = []
+    
     for i in range(0, len(video_files), 2):
         if i + 1 < len(video_files):
             file1 = video_files[i]
             file2 = video_files[i + 1]
-            
-            # Get duration from first file
-            file1_path = input_dir / file1
-            duration = get_video_duration(file1_path)
-            
-            # Create output filename with class prefix, sequential numbering, and duration
+            first_files.append(input_dir / file1)
+            pair_indices.append((i, file1, file2))
+        else:
+            print(f"\nWarning: {video_files[i]} has no pair (odd number of files)")
+    
+    # Get durations in parallel
+    if first_files:
+        print("\nDetecting video durations...")
+        with ThreadPoolExecutor(max_workers=4) as executor:
+            durations = list(executor.map(get_video_duration, first_files))
+        
+        # Create pairs with durations
+        for (duration, (i, file1, file2)) in zip(durations, pair_indices):
             output_num = args.start + (i // 2)
             if args.class_name:
                 output = f"{output_num}.{args.class_name} ({duration}).mp4"
@@ -125,8 +138,6 @@ def main():
                 output = f"{output_num} ({duration}).mp4"
             
             pairs.append((file1, file2, output))
-        else:
-            print(f"\nWarning: {video_files[i]} has no pair (odd number of files)")
     
     print(f"\nWill create {len(pairs)} merged files in {output_dir}:")
     for file1, file2, output in pairs:

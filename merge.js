@@ -35,11 +35,11 @@ function findVideoFiles(inputDir) {
 
 async function getVideoDuration(filePath) {
   try {
-    const cmd = `ffprobe -v quiet -print_format json -show_format "${filePath}"`;
+    // Use faster ffprobe command to get only duration
+    const cmd = `ffprobe -v quiet -show_entries format=duration -of csv=p=0 "${filePath}"`;
     const { stdout } = await execAsync(cmd);
-    const data = JSON.parse(stdout);
 
-    const durationSeconds = parseFloat(data.format.duration);
+    const durationSeconds = parseFloat(stdout.trim());
     const hours = Math.floor(durationSeconds / 3600);
     const minutes = Math.floor((durationSeconds % 3600) / 60);
     const seconds = Math.floor(durationSeconds % 60);
@@ -145,30 +145,45 @@ async function main() {
 
   // Create pairs
   const pairs = [];
+  const durationPromises = [];
+
+  // Collect all duration detection tasks
   for (let i = 0; i < videoFiles.length; i += 2) {
     if (i + 1 < videoFiles.length) {
       const file1 = videoFiles[i];
       const file2 = videoFiles[i + 1];
-
-      // Get duration from first file
       const file1Path = path.join(inputDir, file1);
-      const duration = await getVideoDuration(file1Path);
 
-      // Create output filename
-      const outputNum = startNum + Math.floor(i / 2);
-      let output;
-      if (className) {
-        output = `${outputNum}.${className} (${duration}).mp4`;
-      } else {
-        output = `${outputNum} (${duration}).mp4`;
-      }
-
-      pairs.push({ file1, file2, output });
-    } else {
-      console.log(
-        `\nWarning: ${videoFiles[i]} has no pair (odd number of files)`,
+      // Add duration detection to promises array
+      durationPromises.push(
+        getVideoDuration(file1Path).then((duration) => ({
+          file1,
+          file2,
+          duration,
+          index: i,
+        })),
       );
     }
+  }
+
+  // Get all durations in parallel
+  console.log("\nDetecting video durations...");
+  const results = await Promise.all(durationPromises);
+
+  // Create pairs with durations
+  for (const result of results) {
+    const { file1, file2, duration, index } = result;
+
+    // Create output filename
+    const outputNum = startNum + Math.floor(index / 2);
+    let output;
+    if (className) {
+      output = `${outputNum}.${className} (${duration}).mp4`;
+    } else {
+      output = `${outputNum} (${duration}).mp4`;
+    }
+
+    pairs.push({ file1, file2, output });
   }
 
   if (pairs.length === 0) {

@@ -9,8 +9,7 @@ const execAsync = promisify(exec);
 
 /**
  * Merge videoplayback files sequentially in pairs
- * Place files in ../input directory
- * Output goes to ../output directory
+ * Simple version with automatic duration detection
  */
 
 function findVideoFiles(inputDir) {
@@ -32,6 +31,23 @@ function findVideoFiles(inputDir) {
   // Sort by number
   videoFiles.sort((a, b) => a.number - b.number);
   return videoFiles.map((f) => f.name);
+}
+
+async function getVideoDuration(filePath) {
+  try {
+    const cmd = `ffprobe -v quiet -print_format json -show_format "${filePath}"`;
+    const { stdout } = await execAsync(cmd);
+    const data = JSON.parse(stdout);
+
+    const durationSeconds = parseFloat(data.format.duration);
+    const hours = Math.floor(durationSeconds / 3600);
+    const minutes = Math.floor((durationSeconds % 3600) / 60);
+    const seconds = Math.floor(durationSeconds % 60);
+
+    return `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
+  } catch (error) {
+    return "00:00:00";
+  }
 }
 
 async function mergeVideos(file1, file2, output, inputDir, outputDir) {
@@ -59,9 +75,6 @@ function parseArguments(args) {
       case "--dry-run":
         dryRun = true;
         break;
-      case "--class":
-        className = args[++i];
-        break;
       case "--start":
         startNum = Number.parseInt(args[++i], 10);
         break;
@@ -69,6 +82,11 @@ function parseArguments(args) {
       case "-h":
         showHelp();
         process.exit(0);
+      default:
+        // If it's not a flag, treat it as class name
+        if (!args[i].startsWith("--") && !className) {
+          className = args[i];
+        }
     }
   }
 
@@ -77,89 +95,22 @@ function parseArguments(args) {
 
 function showHelp() {
   console.log(`
-Usage: node merge_sequential.js [options]
+Usage: node merge.js [name] [options]
+
+Arguments:
+  name                  Class name for output files (optional)
 
 Options:
-  --dry-run              Show what would be merged without actually merging
-  --class <name>         Class name prefix for output files (e.g., 'classA')
-  --start <number>       Starting number for output files (default: 1)
-  -h, --help             Show this help message
+  --dry-run             Show what would be merged without actually merging
+  --start <number>      Starting number for output files (default: 1)
+  -h, --help            Show this help message
+
+Examples:
+  node merge.js                    # Default: 1.mp4, 2.mp4...
+  node merge.js accounting          # Named: 1.accounting.mp4, 2.accounting.mp4...
+  node merge.js math --start 5     # Custom start: 5.math.mp4, 6.math.mp4...
+  node merge.js --dry-run          # Preview without merging
             `);
-}
-
-function createPairs(videoFiles, className, startNum) {
-  const pairs = [];
-  for (let i = 0; i < videoFiles.length; i += 2) {
-    if (i + 1 < videoFiles.length) {
-      const file1 = videoFiles[i];
-      const file2 = videoFiles[i + 1];
-
-      // Create output filename with class prefix and sequential numbering
-      const outputNum = startNum + Math.floor(i / 2);
-      const prefix = className ? `${className}_` : "";
-      const output = `${prefix}${outputNum}.mp4`;
-
-      pairs.push({ file1, file2, output });
-    } else {
-      console.log(
-        `\nWarning: ${videoFiles[i]} has no pair (odd number of files)`,
-      );
-    }
-  }
-  return pairs;
-}
-
-async function checkFfmpeg() {
-  try {
-    await execAsync("ffmpeg -version");
-    return true;
-  } catch (error) {
-    console.log(
-      "\nError: ffmpeg not found. Please install ffmpeg and ensure it's in your PATH.",
-    );
-    return false;
-  }
-}
-
-async function askConfirmation() {
-  const readline = require("node:readline");
-  const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout,
-  });
-
-  const answer = await new Promise((resolve) => {
-    rl.question("\nProceed with merging? (y/N): ", resolve);
-  });
-  rl.close();
-
-  return answer.toLowerCase() === "y";
-}
-
-async function processPairs(pairs, inputDir, outputDir) {
-  let successCount = 0;
-  for (let i = 0; i < pairs.length; i++) {
-    const pair = pairs[i];
-    console.log(
-      `\n[${i + 1}/${pairs.length}] Merging ${pair.file1} + ${pair.file2}...`,
-    );
-
-    if (
-      await mergeVideos(
-        pair.file1,
-        pair.file2,
-        pair.output,
-        inputDir,
-        outputDir,
-      )
-    ) {
-      console.log(`  ✅ Created ${pair.output}`);
-      successCount++;
-    } else {
-      console.log(`  ❌ Failed to merge ${pair.file1} + ${pair.file2}`);
-    }
-  }
-  return successCount;
 }
 
 async function main() {
@@ -167,9 +118,9 @@ async function main() {
   const { dryRun, className, startNum } = parseArguments(args);
 
   // Set up directories
-  const scriptDir = path.dirname(__filename);
-  const inputDir = path.join(scriptDir, "..", "input");
-  const outputDir = path.join(scriptDir, "..", "output");
+  const scriptDir = __dirname;
+  const inputDir = path.join(scriptDir, "input");
+  const outputDir = path.join(scriptDir, "output");
 
   // Create directories if they don't exist
   fs.mkdirSync(inputDir, { recursive: true });
@@ -193,7 +144,32 @@ async function main() {
   });
 
   // Create pairs
-  const pairs = createPairs(videoFiles, className, startNum);
+  const pairs = [];
+  for (let i = 0; i < videoFiles.length; i += 2) {
+    if (i + 1 < videoFiles.length) {
+      const file1 = videoFiles[i];
+      const file2 = videoFiles[i + 1];
+
+      // Get duration from first file
+      const file1Path = path.join(inputDir, file1);
+      const duration = await getVideoDuration(file1Path);
+
+      // Create output filename
+      const outputNum = startNum + Math.floor(i / 2);
+      let output;
+      if (className) {
+        output = `${outputNum}.${className} (${duration}).mp4`;
+      } else {
+        output = `${outputNum} (${duration}).mp4`;
+      }
+
+      pairs.push({ file1, file2, output });
+    } else {
+      console.log(
+        `\nWarning: ${videoFiles[i]} has no pair (odd number of files)`,
+      );
+    }
+  }
 
   if (pairs.length === 0) {
     console.log("\nNo pairs to merge!");
@@ -211,18 +187,56 @@ async function main() {
   }
 
   // Check if ffmpeg is installed
-  if (!(await checkFfmpeg())) {
+  try {
+    await execAsync("ffmpeg -version");
+  } catch (error) {
+    console.log(
+      "\nError: ffmpeg not found. Please install ffmpeg and ensure it's in your PATH.",
+    );
     process.exit(1);
   }
 
   // Ask for confirmation
-  if (!(await askConfirmation())) {
+  const readline = require("node:readline");
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout,
+  });
+
+  const answer = await new Promise((resolve) => {
+    rl.question("\nProceed with merging? (y/N): ", resolve);
+  });
+  rl.close();
+
+  if (answer.toLowerCase() !== "y") {
     console.log("Cancelled.");
     return;
   }
 
   // Merge pairs
-  const successCount = await processPairs(pairs, inputDir, outputDir);
+  let successCount = 0;
+  for (let i = 0; i < pairs.length; i++) {
+    const pair = pairs[i];
+    console.log(
+      `\n[${i + 1}/${pairs.length}] Merging ${pair.file1} + ${pair.file2}...`,
+    );
+
+    if (
+      await mergeVideos(
+        pair.file1,
+        pair.file2,
+        pair.output,
+        inputDir,
+        outputDir,
+      )
+    ) {
+      console.log(`  ✅ Created ${pair.output}`);
+      successCount++;
+    } else {
+      console.log(`  ❌ Failed to merge ${pair.file1} + ${pair.file2}`);
+    }
+  }
+
   console.log(
     `\nDone! Successfully merged ${successCount}/${pairs.length} pairs.`,
   );

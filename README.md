@@ -23,8 +23,9 @@
 
    **Node.js:**
    ```bash
-   cd scripts
-   node merge_sequential.js
+   node merge.js
+   # Or with a name:
+   node merge.js accounting
    ```
 
 3. **Find results** in `output/`:
@@ -32,6 +33,14 @@
    output/
    ├── 1.mp4      # from (1)+(2)
    └── 2.mp4      # from (3)+(4)
+   ```
+
+   Or with custom naming:
+   ```
+   output/
+   ├── 1.class (00:15:30).mp4      # with class name and duration
+   ├── 2.accounting (00:45:20).mp4 # with class name and duration
+   └── 3 (01:12:45).mp4           # with duration only
    ```
 
 ## Features
@@ -48,24 +57,32 @@
 
 | Option | Description | Example |
 |--------|-------------|---------|
-| `--class <name>` | Add prefix to files | `--class math101` → `math101_1.mp4` |
+| `name` | Class name (just type it, no -- needed) | `accounting` → `1.accounting (00:15:30).mp4` |
 | `--start <num>` | Starting number | `--start 5` → `5.mp4, 6.mp4...` |
 | `--dry-run` | Preview without merging | `--dry-run` |
 
 ## Examples
 
 ```bash
-# Default: 1.mp4, 2.mp4, 3.mp4...
+# Default: 1.mp4, 2.mp4, 3.mp4... (with duration)
 python merge_sequential.py
+node merge.js
 
-# With class: classA_1.mp4, classA_2.mp4...
-node merge_sequential.js --class classA
+# With name: 1.accounting (00:15:30).mp4, 2.accounting (00:45:20).mp4...
+python merge_sequential.py --class accounting
+node merge.js accounting
 
 # Custom start: 10.mp4, 11.mp4, 12.mp4...
 python merge_sequential.py --start 10
+node merge.js --start 10
 
-# Combined: physics_5.mp4, physics_6.mp4...
-node merge_sequential.js --class physics --start 5
+# Combined: 5.physics (01:12:45).mp4, 6.physics (00:58:30).mp4...
+python merge_sequential.py --class physics --start 5
+node merge.js physics --start 5
+
+# Preview first
+python merge_sequential.py --dry-run
+node merge.js --dry-run
 ```
 
 ## Requirements
@@ -112,9 +129,12 @@ Ensure ffmpeg is installed on your system.
 audio-video-merger/
 ├── input/      # ← Place your videoplayback files here
 ├── output/     # ← Merged files appear here
-└── scripts/    # ← Merger scripts
-    ├── merge_sequential.py
-    └── merge_sequential.js
+├── scripts/    # ← Python scripts only
+│   ├── merge_sequential.py
+│   ├── merge_sequential_v2.py
+│   └── ... (other Python modules)
+├── merge.js    # ← Node.js merger (in root)
+└── README.md
 ```
 
 ## How It Works

@@ -11,6 +11,7 @@ import subprocess
 import sys
 from pathlib import Path
 import re
+import json
 
 def find_video_files(input_dir):
     """Find all videoplayback files and sort them by number."""
@@ -26,6 +27,29 @@ def find_video_files(input_dir):
     # Sort by the number in parentheses
     files.sort(key=lambda x: x[0])
     return [f[1] for f in files]
+
+def get_video_duration(file_path):
+    """Get video duration in HH:MM:SS format."""
+    try:
+        cmd = [
+            'ffprobe',
+            '-v', 'quiet',
+            '-print_format', 'json',
+            '-show_format',
+            str(file_path)
+        ]
+        
+        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+        data = json.loads(result.stdout)
+        
+        duration_seconds = float(data['format']['duration'])
+        hours = int(duration_seconds // 3600)
+        minutes = int((duration_seconds % 3600) // 60)
+        seconds = int(duration_seconds % 60)
+        
+        return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+    except:
+        return "00:00:00"
 
 def merge_videos(file1, file2, output, input_dir, output_dir):
     """Merge two video files using ffmpeg."""
@@ -89,10 +113,16 @@ def main():
             file1 = video_files[i]
             file2 = video_files[i + 1]
             
-            # Create output filename with class prefix and sequential numbering
+            # Get duration from first file
+            file1_path = input_dir / file1
+            duration = get_video_duration(file1_path)
+            
+            # Create output filename with class prefix, sequential numbering, and duration
             output_num = args.start + (i // 2)
-            prefix = f"{args.class_name}_" if args.class_name else ""
-            output = f"{prefix}{output_num}.mp4"
+            if args.class_name:
+                output = f"{output_num}.{args.class_name} ({duration}).mp4"
+            else:
+                output = f"{output_num} ({duration}).mp4"
             
             pairs.append((file1, file2, output))
         else:

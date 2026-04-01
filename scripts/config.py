@@ -4,7 +4,7 @@ Configuration settings for the audio video merger.
 """
 
 from pathlib import Path
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import List
 
 
@@ -13,9 +13,9 @@ class MergeConfig:
     """Configuration for video merging operations."""
     
     # Directory settings
-    script_dir: Path = Path(__file__).parent
-    input_dir: Path = script_dir.parent / "input"
-    output_dir: Path = script_dir.parent / "output"
+    script_dir: Path = field(default_factory=lambda: Path(__file__).parent)
+    input_dir: Path = field(default_factory=lambda: Path(__file__).parent.parent / "input")
+    output_dir: Path = field(default_factory=lambda: Path(__file__).parent.parent / "output")
     
     # File patterns
     input_pattern: str = r"videoplayback\s*\((\d+)\)\.mp4"
@@ -27,7 +27,7 @@ class MergeConfig:
     # ffmpeg settings
     ffmpeg_video_codec: str = "copy"
     ffmpeg_audio_codec: str = "aac"
-    ffmpeg_extra_args: List[str] = ["-shortest", "-y"]
+    ffmpeg_extra_args: List[str] = field(default_factory=lambda: ["-shortest", "-y"])
     
     # Progress settings
     progress_bar_width: int = 50

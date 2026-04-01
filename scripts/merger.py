@@ -129,7 +129,7 @@ class VideoMerger:
         
         return True, None
     
-    def get_merge_plan(self, files: list, class_name: str = "", start_number: int = 1) -> list:
+    def get_merge_plan(self, files: list, class_name: str = "", start_number: int = 1, include_duration: bool = True) -> list:
         """
         Create a plan for merging files.
         
@@ -137,11 +137,12 @@ class VideoMerger:
             files: List of input filenames
             class_name: Optional class prefix
             start_number: Starting number for output
+            include_duration: Whether to include duration in filename
             
         Returns:
             List of merge operations
         """
-        from utils import create_output_filename
+        from utils import create_output_filename, get_video_duration
         
         plan = []
         for i in range(0, len(files), 2):
@@ -149,13 +150,22 @@ class VideoMerger:
                 file1 = files[i]
                 file2 = files[i + 1]
                 output_num = start_number + (i // 2)
-                output = create_output_filename(class_name, output_num)
+                
+                # Get duration if requested
+                duration = None
+                if include_duration:
+                    # Try to get duration from first file
+                    file1_path = self.config.input_dir / file1
+                    duration = get_video_duration(file1_path)
+                
+                output = create_output_filename(class_name, output_num, duration)
                 
                 plan.append({
                     'input1': file1,
                     'input2': file2,
                     'output': output,
-                    'index': output_num
+                    'index': output_num,
+                    'duration': duration
                 })
         
         return plan

@@ -86,19 +86,63 @@ def format_size(size_bytes: int) -> str:
     return f"{size_bytes:.1f} TB"
 
 
-def create_output_filename(class_name: str, index: int) -> str:
+def get_video_duration(file_path: Path) -> str:
     """
-    Create output filename with class prefix.
+    Get video duration in HH:MM:SS format.
+    
+    Args:
+        file_path: Path to the video file
+        
+    Returns:
+        Duration string in HH:MM:SS format
+    """
+    import subprocess
+    import json
+    
+    try:
+        cmd = [
+            'ffprobe',
+            '-v', 'quiet',
+            '-print_format', 'json',
+            '-show_format',
+            str(file_path)
+        ]
+        
+        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+        data = json.loads(result.stdout)
+        
+        duration_seconds = float(data['format']['duration'])
+        hours = int(duration_seconds // 3600)
+        minutes = int((duration_seconds % 3600) // 60)
+        seconds = int(duration_seconds % 60)
+        
+        return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+    except:
+        return "00:00:00"
+
+
+def create_output_filename(class_name: str, index: int, duration: str = None) -> str:
+    """
+    Create output filename with class prefix and duration.
     
     Args:
         class_name: Class name prefix
         index: Sequential index
+        duration: Optional duration string
         
     Returns:
         Output filename
     """
-    prefix = f"{class_name}_" if class_name else ""
-    return f"{prefix}{index}.mp4"
+    if class_name:
+        if duration:
+            return f"{index}.{class_name} ({duration}).mp4"
+        else:
+            return f"{index}.{class_name}.mp4"
+    else:
+        if duration:
+            return f"{index} ({duration}).mp4"
+        else:
+            return f"{index}.mp4"
 
 
 def estimate_output_size(input_files: List[str], input_dir: Path) -> int:
